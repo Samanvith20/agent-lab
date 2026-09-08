@@ -1,6 +1,14 @@
+﻿vector_store:
+  provider: qdrant
+qdrant:
+  collection_name: codebase
+
+llm:
+  provider: openai
+  model: gpt-4o-mini
 embeddings:
-   provider: openai
-   model: text-embedding-3-small
+  provider: openai
+  model: text-embedding-3-small
 chromadb:
   persist_dir: .chromadb/
   collection_name: codebase
