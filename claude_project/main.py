@@ -1,4 +1,4 @@
-﻿"""Command-line interface for indexing and querying a selected project."""
+"""Command-line interface for indexing and querying a selected project."""
 import argparse
 from pathlib import Path
 
@@ -77,3 +77,6 @@ def run():
     finally:
         if index is not None:
             index.client.close()
+
+if __name__ == "__main__":
+    run()

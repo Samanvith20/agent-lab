@@ -8,4 +8,6 @@ If the retrieved context does not answer the question, say so. Do not invent fil
 
 
 def build_agent(llm, vector_store):
-    return create_agent(llm, tools=[build_search_tool(vector_store)], system_prompt=SYSTEM_PROMPT)
+    return create_agent(llm,
+                         tools=[build_search_tool(vector_store)], 
+                         system_prompt=SYSTEM_PROMPT)
