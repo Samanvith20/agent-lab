@@ -1,6 +1,7 @@
 # Secrets — never commit
 .env
 
+
 # Vector store data
 .chromadb/
 
@@ -16,3 +17,6 @@ poetry.lock
 # Virtual environments
 .venv/
 venv/
+
+#tests
+tests/__pycache__/

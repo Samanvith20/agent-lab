@@ -1,4 +1,4 @@
-﻿# Agent Lab
+# Agent Lab
 
 Python 3.12+ codebase assistant using LangChain, OpenAI embeddings, and Qdrant.
 
@@ -8,7 +8,7 @@ From D:\agent-lab:
 
 ```powershell
 poetry install
-poetry run agent --project "D:\path\to\your\project"
+poetry run claude-cli --project "D:\path\to\your\project"
 ```
 
 Without `--project`, the current directory is indexed. Startup sends eligible
@@ -51,7 +51,7 @@ programmatic guarantee that every answer calls the tool.
 
 ```powershell
 poetry run python -m unittest discover -s tests -v
-poetry run agent --help
+poetry run claude-cli --help
 ```
 
 Tests use in-memory Qdrant and fake embeddings/chat responses: no API spend.
@@ -71,17 +71,17 @@ unchanged-index reuse, changed content, repository separation and inspection.
   tenant authentication, backups and retrieval-quality evaluation are not implemented.
 - Existing legacy `codebase` collections are not deleted or reused by the snapshot scheme.
 
-The CLI entry point remains `poetry run agent`, mapped to `claude_project.main:run`.
+The CLI entry point is `poetry run claude-cli`, mapped to `claude_project.main:run`.
 
 ## Global command installed with pipx
 
-The global `agent` command uses its own pipx environment, separate from Poetry.
+The global `claude-cli` command uses its own pipx environment, separate from Poetry.
 After adding dependencies to `pyproject.toml`, update that environment:
 
 ```powershell
 python -m pipx runpip agent-lab install --editable D:\agent-lab
 ```
 
-Then run `agent --help` to verify imports, or run `agent` from the project you
+Then run `claude-cli --help` to verify imports, or run `claude-cli` from the project you
 want to index. An editable install picks up source edits automatically, but new
 dependencies require the update command above.
