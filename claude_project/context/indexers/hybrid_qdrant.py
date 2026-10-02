@@ -6,7 +6,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from langchain_core.documents import Document
 from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
-from qdrant_client import QdrantClient
+from qdrant_client import QdrantClient, models
 
 from claude_project.config.config import config
 from claude_project.observability.logger import get_logger
@@ -24,6 +24,17 @@ RETRIEVAL_MODE_MAP = {
 def _get_retrieval_mode() -> RetrievalMode:
     mode = config["vector_store"].get("retrieval_mode", "hybrid")
     return RETRIEVAL_MODE_MAP.get(mode, RetrievalMode.HYBRID)
+
+
+def _get_qdrant_timeout() -> int:
+    """Return the REST request timeout, allowing slower hosted Qdrant writes."""
+    try:
+        timeout = int(os.getenv("QDRANT_TIMEOUT_SECONDS", "120"))
+    except ValueError as exc:
+        raise ValueError("QDRANT_TIMEOUT_SECONDS must be a positive integer.") from exc
+    if timeout < 1:
+        raise ValueError("QDRANT_TIMEOUT_SECONDS must be a positive integer.")
+    return timeout
 
 
 def index_codebase(repo_path: str, embedder, client=None) -> QdrantVectorStore:
@@ -46,9 +57,10 @@ def index_codebase(repo_path: str, embedder, client=None) -> QdrantVectorStore:
     url = os.getenv("QDRANT_URL", "http://localhost:6333")
     api_key = os.getenv("QDRANT_API_KEY") or None
     retrieval_mode = _get_retrieval_mode()
+    timeout = _get_qdrant_timeout()
     
     owned = client is None
-    client = client or QdrantClient(url=url, api_key=api_key, timeout=30)
+    client = client or QdrantClient(url=url, api_key=api_key, timeout=timeout)
     
     try:
         sparse_embedder = FastEmbedSparse(model_name="Qdrant/bm25")
@@ -64,6 +76,7 @@ def index_codebase(repo_path: str, embedder, client=None) -> QdrantVectorStore:
                     retrieval_mode=retrieval_mode,
                     url=url,
                     api_key=api_key,
+                    timeout=timeout,
                     collection_name=collection_name,
                 )
 
@@ -87,17 +100,49 @@ def index_codebase(repo_path: str, embedder, client=None) -> QdrantVectorStore:
                         ))
 
         ids = [str(uuid5(NAMESPACE_URL, collection_name + ":" + str(i))) for i in range(len(docs))]
-        store = QdrantVectorStore.from_documents(
-            docs,
-            embedding=embedder,
-            sparse_embedding=sparse_embedder,
-            retrieval_mode=retrieval_mode,
-            url=url,
-            api_key=api_key,
-            collection_name=collection_name,
-            ids=ids,
-            batch_size=50,
+        if not docs:
+            raise ValueError("Parsing completed but produced no indexable chunks.")
+
+        logger.info(
+            "Prepared %d chunks; starting dense embedding, sparse vector generation, "
+            "and Qdrant upsert (batch size 10, request timeout %d seconds)",
+            len(docs), timeout,
         )
+        try:
+            dense_vector = embedder.embed_documents([docs[0].page_content])[0]
+            client.create_collection(
+                collection_name=collection_name,
+                vectors_config={
+                    "": models.VectorParams(
+                        size=len(dense_vector), distance=models.Distance.COSINE
+                    )
+                },
+                sparse_vectors_config={
+                    "langchain-sparse": models.SparseVectorParams(
+                        index=models.SparseIndexParams(on_disk=False)
+                    )
+                },
+            )
+            store = QdrantVectorStore(
+                client=client,
+                collection_name=collection_name,
+                embedding=embedder,
+                sparse_embedding=sparse_embedder,
+                retrieval_mode=retrieval_mode,
+                validate_collection_config=False,
+            )
+            for start in range(0, len(docs), 10):
+                end = min(start + 10, len(docs))
+                logger.info("Embedding and upserting chunks %d-%d of %d", start + 1, end, len(docs))
+                store.add_documents(docs[start:end], ids=ids[start:end], batch_size=10)
+        except Exception:
+            logger.exception(
+                "Hybrid indexing failed during embedding/vector generation or Qdrant upsert "
+                "for collection %s (%d chunks)",
+                collection_name,
+                len(docs),
+            )
+            raise
         logger.info(f"Hybrid indexing complete. Total chunks indexed: {len(docs)}")
         return store
     except Exception:

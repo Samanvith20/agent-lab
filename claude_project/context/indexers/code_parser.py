@@ -63,7 +63,7 @@ class ParsedChunk:
 
 def parse_file(filepath: str) -> list[ParsedChunk]:
   """Entry point — routes to AST parsing or sliding window based on file type."""
-  ext = Path(filepath).suffix.lower()
+  ext = Path(filepath).suffix.lower()                                                                                                                                                                                                                                                                                                                                                                                                                                                               
 
 
   if ext in TEXT_EXTENSIONS:
@@ -72,7 +72,7 @@ def parse_file(filepath: str) -> list[ParsedChunk]:
 
 
   language_name = EXTENSION_TO_LANGUAGE.get(ext)
-  if not language_name:
+  if not language_name:                                                                                                                                                                                                                                                                                                                                                                                                                                                             
       raise ValueError(f"Unsupported file type: {ext}")
 
 
@@ -84,6 +84,7 @@ def _parse_with_treesitter(source: str, filepath: str, language_name: str) -> li
   """Parse source with the appropriate tree-sitter grammar and extract named blocks."""
   logger.info(f"Parsing {language_name} file: {filepath}")
   try:
+     # it convert the source into Ast tree
       parser = get_parser(language_name)
   except (AttributeError, ValueError):
       return _sliding_window(source.splitlines(), filepath)

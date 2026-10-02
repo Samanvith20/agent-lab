@@ -1,10 +1,10 @@
-"""SQLite-backed conversation memory and context summarization."""
+"""Async SQLite-backed conversation memory and context summarization."""
 
-import sqlite3
 from pathlib import Path
+from contextlib import AbstractAsyncContextManager
 
 from langchain.agents.middleware import SummarizationMiddleware
-from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from claude_project.config.config import config
 from claude_project.observability.logger import get_logger
@@ -19,18 +19,18 @@ def memory_db_path() -> Path:
     return db_path
 
 
-def get_checkpointer() -> SqliteSaver:
-    """Create a SQLite checkpointer for the lifetime of an agent."""
+def get_checkpointer() -> AbstractAsyncContextManager[AsyncSqliteSaver]:
+    """Return an async SQLite saver context that owns its database connection."""
     db_path = memory_db_path()
     logger.info("Using SQLite checkpointer at %s", db_path)
-    connection = sqlite3.connect(db_path, check_same_thread=False)
-    return SqliteSaver(connection)
+    return AsyncSqliteSaver.from_conn_string(str(db_path))
 
 
-def get_session_history(thread_id: str) -> list[dict[str, str]]:
+async def get_session_history(
+    thread_id: str, checkpointer: AsyncSqliteSaver
+) -> list[dict[str, str]]:
     """Return the latest persisted messages for a thread, if it exists."""
-    checkpointer = get_checkpointer()
-    checkpoint = checkpointer.get({"configurable": {"thread_id": thread_id}})
+    checkpoint = await checkpointer.aget({"configurable": {"thread_id": thread_id}})
     if not checkpoint:
         return []
 
